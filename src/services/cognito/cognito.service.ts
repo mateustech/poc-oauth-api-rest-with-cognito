@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import * as AWS from 'aws-sdk';
 import { CognitoIdentityServiceProvider } from 'aws-sdk';
 import { Config } from 'src/config/config';
 import { CreateUserDto } from './../../useCases/CreateUser/CreateUser.dto';
@@ -9,11 +10,12 @@ export class CognitoService implements ICognitoService {
   cognito: AWS.CognitoIdentityServiceProvider;
 
   constructor(private readonly config: Config) {
-    this.cognito = new CognitoIdentityServiceProvider({
+    AWS.config.update({
       region: config.aws.AWS_USER_REGION,
       accessKeyId: config.aws.AWS_USER_ACCESS_KEY || undefined,
       secretAccessKey: config.aws.AWS_USER_SECRET_KEY || undefined,
     });
+    this.cognito = new AWS.CognitoIdentityServiceProvider();
   }
 
   async createUser(
@@ -104,7 +106,7 @@ export class CognitoService implements ICognitoService {
     });
   }
 
-  getUserAttributes = (
+  private getUserAttributes = (
     payload: CreateUserDto,
   ): CognitoIdentityServiceProvider.AttributeListType => {
     const attributeList: CognitoIdentityServiceProvider.AttributeListType = [];
@@ -122,4 +124,33 @@ export class CognitoService implements ICognitoService {
 
     return attributeList;
   };
+
+  async authUser(
+    username: string,
+    password: string,
+  ): Promise<CognitoIdentityServiceProvider.AdminInitiateAuthResponse> {
+    const params: CognitoIdentityServiceProvider.AdminInitiateAuthRequest = {
+      AuthFlow: 'ADMIN_NO_SRP_AUTH',
+      ClientId: this.config.cognito.COGNITO_WEB_CLIENT_ID,
+      UserPoolId: this.config.cognito.COGNITO_USER_POOL_ID,
+      AuthParameters: {
+        USERNAME: username,
+        PASSWORD: password,
+      },
+    };
+
+    return new Promise((resolve, reject) => {
+      this.cognito.adminInitiateAuth(params, (err, data) => {
+        if (err) {
+          if (err.code !== 'UserNotFoundException') {
+            reject(err);
+          } else {
+            resolve(null);
+          }
+        } else {
+          resolve(data);
+        }
+      });
+    });
+  }
 }

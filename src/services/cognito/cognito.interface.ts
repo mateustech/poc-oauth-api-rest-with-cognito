@@ -18,4 +18,9 @@ export interface ICognitoService {
   getUserByUsername(
     username,
   ): Promise<CognitoIdentityServiceProvider.AdminGetUserResponse>;
+
+  authUser(
+    username: string,
+    password: string,
+  ): Promise<CognitoIdentityServiceProvider.AdminInitiateAuthResponse>;
 }
